@@ -26,11 +26,14 @@ function createImapClient(email, password) {
   return client;
 }
 
-function createSmtpTransport(email, password) {
+function createSmtpTransport(email, password, port = 465) {
+  const isSsl = port === 465;
   return nodemailer.createTransport({
     host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
+    port,
+    secure: isSsl,
+    requireTLS: !isSsl,
+    family: 4,
     connectionTimeout: 15000,
     greetingTimeout: 15000,
     socketTimeout: 30000,
@@ -41,8 +44,24 @@ function createSmtpTransport(email, password) {
   });
 }
 
+function isNetworkOrTimeoutError(err) {
+  const msg = `${err?.code || ''} ${err?.message || ''}`;
+  return /ETIMEDOUT|ETIMEOUT|ECONNREFUSED|ENETUNREACH|EHOSTUNREACH|ESOCKET|Greeting never received|timeout/i.test(msg);
+}
+
+async function sendMailWithFallback(email, password, mailOptions) {
+  try {
+    return await createSmtpTransport(email, password, 465).sendMail(mailOptions);
+  } catch (err) {
+    if (!isNetworkOrTimeoutError(err)) throw err;
+    console.warn('[SMTP 465 fallback to 587]', err.message || err.code);
+    return await createSmtpTransport(email, password, 587).sendMail(mailOptions);
+  }
+}
+
 /**
  * Verify Gmail IMAP + SMTP credentials for the connecting owner.
+ * Supports cloud hosts (like Render) where IPv6 is disabled or port 465/587 may be restricted.
  */
 async function verifyGmailCredentials(email, password) {
   const imap = createImapClient(email, password);
@@ -51,6 +70,11 @@ async function verifyGmailCredentials(email, password) {
     await imap.logout();
   } catch (err) {
     const msg = err.responseText || err.message || 'Authentication failed';
+    if (/web login required|webloginrequired|alert/i.test(msg)) {
+      throw new Error(
+        `Google blocked the cloud server sign-in ("${msg}"). Open Google Account -> Security -> Recent security activity and confirm "Yes, it was me", then try again.`
+      );
+    }
     if (/invalid credentials|application-specific password|username and password not accepted/i.test(msg)) {
       throw new Error(
         'Gmail rejected the credentials. Please make sure you are using a 16-character Google App Password (with 2-Step Verification enabled on your Google Account) rather than your regular Google login password.'
@@ -59,8 +83,26 @@ async function verifyGmailCredentials(email, password) {
     throw new Error(`Could not connect to Gmail IMAP: ${msg}`);
   }
 
-  const transporter = createSmtpTransport(email, password);
-  await transporter.verify();
+  let smtpWarning = null;
+  try {
+    await createSmtpTransport(email, password, 465).verify();
+  } catch (err465) {
+    if (!isNetworkOrTimeoutError(err465)) {
+      throw new Error(`Gmail SMTP rejected the credentials: ${err465.message}`);
+    }
+    try {
+      await createSmtpTransport(email, password, 587).verify();
+    } catch (err587) {
+      if (!isNetworkOrTimeoutError(err587)) {
+        throw new Error(`Gmail SMTP rejected the credentials: ${err587.message}`);
+      }
+      smtpWarning =
+        'IMAP connected, but outbound SMTP (ports 465/587) is blocked or timed out on this hosting server. You can read emails and save AI drafts to Gmail Drafts, while direct SMTP sending may require a host that allows outbound SMTP.';
+      console.warn('[SMTP Verify Warning]', err587.message || err587.code);
+    }
+  }
+
+  return { ok: true, smtpWarning };
 }
 
 /**
@@ -121,7 +163,6 @@ async function fetchGmailInbox(email, password, limit = 20) {
  * Send a reply to the sender via Gmail SMTP and optionally mark the original as seen.
  */
 async function sendGmailReply(email, password, { to, subject, body, inReplyTo, ownerName }) {
-  const transporter = createSmtpTransport(email, password);
   const mailOptions = {
     from: ownerName ? `"${ownerName}" <${email}>` : email,
     to,
@@ -134,7 +175,7 @@ async function sendGmailReply(email, password, { to, subject, body, inReplyTo, o
     mailOptions.references = inReplyTo;
   }
 
-  const info = await transporter.sendMail(mailOptions);
+  const info = await sendMailWithFallback(email, password, mailOptions);
   return info.messageId;
 }
 
@@ -142,7 +183,6 @@ async function sendGmailReply(email, password, { to, subject, body, inReplyTo, o
  * Notify the mail owner via email that their AI Assistant handled a message.
  */
 async function sendOwnerNotificationEmail(email, password, { originalEmail, analysis, replyBody, actionTaken }) {
-  const transporter = createSmtpTransport(email, password);
   const subject = `[MailMind AI Notification] ${actionTaken}: "${originalEmail.subject}"`;
   const text = [
     `Hello,`,
@@ -166,7 +206,7 @@ async function sendOwnerNotificationEmail(email, password, { originalEmail, anal
     `— MailMind AI Assistant`,
   ].join('\n');
 
-  await transporter.sendMail({
+  await sendMailWithFallback(email, password, {
     from: `"MailMind AI Assistant" <${email}>`,
     to: email,
     subject,

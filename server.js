@@ -1,3 +1,4 @@
+require('dns').setDefaultResultOrder('ipv4first');
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
@@ -201,7 +202,7 @@ app.post('/api/auth/connect', async (req, res) => {
     const cleanEmail = email.trim();
     const cleanPassword = password.replace(/\s+/g, '');
 
-    await verifyGmailCredentials(cleanEmail, cleanPassword);
+    const verifyResult = await verifyGmailCredentials(cleanEmail, cleanPassword);
 
     const name = (ownerName && ownerName.trim()) || cleanEmail.split('@')[0];
     const emails = await fetchGmailInbox(cleanEmail, cleanPassword, 20);
@@ -213,6 +214,7 @@ app.post('/api/auth/connect', async (req, res) => {
       ownerName: name,
       lastSyncAt: new Date().toISOString(),
       isScanning: false,
+      smtpBlocked: Boolean(verifyResult?.smtpWarning),
       settings: {
         autoReplyMode,
         notifyOwnerByEmail: Boolean(notifyOwnerByEmail),
@@ -228,15 +230,22 @@ app.post('/api/auth/connect', async (req, res) => {
     addNotification(state, {
       type: 'system',
       title: 'Gmail Account Attached',
-      message: `Authenticated ${cleanEmail} via IMAP & SMTP (${emails.length} recent emails). Background Auto-Monitor is ${state.settings.autoMonitor ? `ON (every ${state.settings.pollIntervalSeconds}s)` : 'OFF'}.`,
-      urgency: 'Low',
+      message: `Authenticated ${cleanEmail} via IMAP (${emails.length} recent emails).${verifyResult?.smtpWarning ? ` Note: ${verifyResult.smtpWarning}` : ''} Background Auto-Monitor is ${state.settings.autoMonitor ? `ON (every ${state.settings.pollIntervalSeconds}s)` : 'OFF'}.`,
+      urgency: verifyResult?.smtpWarning ? 'Medium' : 'Low',
     });
 
     userSessions.set(req.sessionID, state);
     req.session.authenticated = true;
     startBackgroundMonitor(req.sessionID);
 
-    res.json({ ok: true, mode: 'live', email: cleanEmail, ownerName: name, count: emails.length });
+    res.json({
+      ok: true,
+      mode: 'live',
+      email: cleanEmail,
+      ownerName: name,
+      count: emails.length,
+      smtpWarning: verifyResult?.smtpWarning || null,
+    });
   } catch (err) {
     res.status(401).json({ error: err.message || 'Failed to connect Gmail account.' });
   }

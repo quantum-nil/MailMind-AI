@@ -20,6 +20,7 @@ function showToast(message) {
 
 async function api(url, options = {}) {
   const res = await fetch(url, {
+    credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
     ...options,
   });
