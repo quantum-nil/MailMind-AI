@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MailMind AI — Personal Gmail Assistant</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <!-- AUTH / CONNECT VIEW -->
+  <main id="auth-view" class="auth-shell">
+    <section class="auth-card">
+      <div class="brand-row">
+        <div class="brand-logo" aria-hidden="true">M</div>
+        <div>
+          <h1>MailMind AI</h1>
+          <p class="subtitle">Your personal Gmail AI assistant</p>
+        </div>
+      </div>
+
+      <p class="auth-intro">
+        Attach your Gmail account to let the AI agent read incoming emails, understand each sender's request, draft or send replies, and notify you of every action.
+      </p>
+
+      <form id="connect-form" class="stack">
+        <div class="field">
+          <label for="email-input">Gmail Address</label>
+          <input id="email-input" type="email" name="email" placeholder="you@gmail.com" autocomplete="email" required />
+        </div>
+
+        <div class="field">
+          <label for="password-input">Gmail App Password</label>
+          <input id="password-input" type="password" name="password" placeholder="16-character App Password" autocomplete="current-password" required />
+          <small class="hint">
+            Uses encrypted IMAP &amp; SMTP directly with Google. Credentials stay in your active session only.
+          </small>
+        </div>
+
+        <div class="grid-2">
+          <div class="field">
+            <label for="owner-name-input">Your Name (for sign-off)</label>
+            <input id="owner-name-input" type="text" name="ownerName" placeholder="e.g. Alex Morgan" />
+          </div>
+          <div class="field">
+            <label for="mode-select">AI Reply Mode</label>
+            <select id="mode-select" name="autoReplyMode">
+              <option value="draft" selected>Draft &amp; Notify Owner (Safe)</option>
+              <option value="auto">Auto-Reply &amp; Notify Owner</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="gemini-key-input">Gemini API Key <span class="optional">(Optional — uses Built-in AI if blank)</span></label>
+          <input id="gemini-key-input" type="password" name="geminiApiKey" placeholder="AIza..." />
+        </div>
+
+        <label class="checkbox-row">
+          <input id="notify-email-checkbox" type="checkbox" name="notifyOwnerByEmail" checked />
+          <span>Email me a notification summary whenever AI replies on my behalf</span>
+        </label>
+
+        <label class="checkbox-row">
+          <input id="auto-monitor-checkbox" type="checkbox" name="autoMonitor" checked />
+          <span>Auto-Monitor inbox in the background every 60s while I'm busy</span>
+        </label>
+
+        <div id="auth-error" class="alert-error" hidden></div>
+
+        <div class="auth-actions">
+          <button type="submit" id="connect-btn" class="btn-primary">
+            Authenticate &amp; Attach Gmail
+          </button>
+          <button type="button" id="demo-btn" class="btn-secondary">
+            Try Interactive Demo
+          </button>
+        </div>
+      </form>
+
+      <details class="setup-guide">
+        <summary>How to get a 16-character Gmail App Password (30 sec)</summary>
+        <ol>
+          <li>Open your <a href="https://myaccount.google.com/security" target="_blank" rel="noopener noreferrer">Google Account Security</a> settings and ensure <strong>2-Step Verification</strong> is turned on.</li>
+          <li>Visit <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer">Google App Passwords</a>.</li>
+          <li>Create a new app password named <code>MailMind AI</code> and paste the 16-character code above.</li>
+        </ol>
+      </details>
+    </section>
+  </main>
+
+  <!-- DASHBOARD VIEW -->
+  <div id="app-view" class="app-shell" hidden>
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="brand-logo small" aria-hidden="true">M</div>
+        <span class="brand-name">MailMind AI</span>
+        <span id="account-badge" class="pill pill-neutral"></span>
+        <span id="ai-engine-badge" class="pill pill-accent"></span>
+        <span id="monitor-badge" class="pill pill-low"></span>
+      </div>
+      <div class="topbar-right">
+        <button type="button" id="refresh-btn" class="btn-ghost" title="Refresh Inbox">
+          Refresh Inbox
+        </button>
+        <button type="button" id="notif-toggle-btn" class="btn-ghost">
+          Notifications <span id="notif-badge" class="badge" hidden>0</span>
+        </button>
+        <button type="button" command="show-modal" commandfor="settings-dialog" id="open-settings-btn" class="btn-ghost">
+          Settings
+        </button>
+        <button type="button" id="disconnect-btn" class="btn-ghost danger">
+          Disconnect
+        </button>
+      </div>
+    </header>
+
+    <div class="workspace">
+      <!-- SIDEBAR -->
+      <aside class="sidebar">
+        <button type="button" id="scan-all-btn" class="btn-primary full-width">
+          Run AI Assistant on Unread
+        </button>
+
+        <nav class="nav-list" aria-label="Mailbox views">
+          <button type="button" class="nav-item active" data-filter="all">
+            <span>All Inbox</span>
+            <span id="count-all" class="nav-count">0</span>
+          </button>
+          <button type="button" class="nav-item" data-filter="unread">
+            <span>Unread</span>
+            <span id="count-unread" class="nav-count">0</span>
+          </button>
+          <button type="button" class="nav-item" data-filter="triaged">
+            <span>AI Drafted</span>
+            <span id="count-triaged" class="nav-count">0</span>
+          </button>
+          <button type="button" class="nav-item" data-filter="replied">
+            <span>AI Replied</span>
+            <span id="count-replied" class="nav-count">0</span>
+          </button>
+          <button type="button" class="nav-item" data-filter="notifications">
+            <span>Owner Notifications</span>
+            <span id="count-notifs" class="nav-count">0</span>
+          </button>
+        </nav>
+
+        <div class="sidebar-card">
+          <h3>Assistant Mode</h3>
+          <p id="sidebar-mode-text" class="muted"></p>
+        </div>
+      </aside>
+
+      <!-- EMAIL LIST + DETAIL OR NOTIFICATIONS -->
+      <section id="mail-workspace" class="mail-workspace">
+        <div id="email-list-pane" class="email-list-pane">
+          <div class="pane-header">
+            <h2 id="list-title">Inbox</h2>
+            <span id="list-subtitle" class="muted"></span>
+          </div>
+          <div id="email-list" class="email-list" role="list"></div>
+        </div>
+
+        <div id="email-detail-pane" class="email-detail-pane">
+          <div id="empty-detail" class="empty-state">
+            <div class="empty-icon" aria-hidden="true">&#9993;</div>
+            <h3>Select an email to inspect</h3>
+            <p class="muted">
+              Choose a message from the left, or click <strong>Run AI Assistant on Unread</strong> to automatically read, understand requests, draft/send replies, and notify you.
+            </p>
+          </div>
+
+          <article id="detail-content" class="detail-content" hidden>
+            <header class="detail-header">
+              <div>
+                <h2 id="detail-subject"></h2>
+                <p id="detail-meta" class="muted"></p>
+              </div>
+              <div class="detail-actions">
+                <button type="button" id="analyze-one-btn" class="btn-secondary">
+                  Analyze with AI
+                </button>
+              </div>
+            </header>
+
+            <div id="detail-body" class="email-body"></div>
+
+            <!-- AI ANALYSIS & REPLY PANEL -->
+            <section id="ai-panel" class="ai-panel" hidden>
+              <div class="ai-panel-header">
+                <div class="ai-title-group">
+                  <span class="pill pill-accent" id="ai-category"></span>
+                  <span class="pill" id="ai-urgency"></span>
+                </div>
+                <span class="muted small-text" id="ai-engine-used"></span>
+              </div>
+
+              <div class="ai-summary-box">
+                <h4>What the Sender is Requesting</h4>
+                <p id="ai-summary"></p>
+                <h5>Action Items for Owner</h5>
+                <ul id="ai-actions"></ul>
+              </div>
+
+              <div id="sent-banner" class="alert-success" hidden></div>
+
+              <form id="reply-form" class="stack">
+                <div class="field">
+                  <label for="reply-subject">AI Drafted Reply Subject</label>
+                  <input id="reply-subject" type="text" required />
+                </div>
+                <div class="field">
+                  <label for="reply-body">AI Drafted Reply Message</label>
+                  <textarea id="reply-body" rows="7" required></textarea>
+                </div>
+                <div class="reply-actions">
+                  <button type="submit" id="send-reply-btn" class="btn-primary">
+                    Send Reply &amp; Notify Owner
+                  </button>
+                  <button type="button" id="regenerate-btn" class="btn-ghost">
+                    Regenerate Draft
+                  </button>
+                </div>
+              </form>
+            </section>
+          </article>
+        </div>
+      </section>
+
+      <!-- OWNER NOTIFICATIONS VIEW -->
+      <section id="notifications-workspace" class="notifications-workspace" hidden>
+        <div class="pane-header">
+          <div>
+            <h2>Owner Notification Center</h2>
+            <p class="muted">Live log of emails read, sender requests understood, and replies sent on your behalf.</p>
+          </div>
+          <button type="button" id="mark-notifs-read-btn" class="btn-secondary">Mark All Read</button>
+        </div>
+        <div id="notifications-list" class="notifications-list"></div>
+      </section>
+    </div>
+  </div>
+
+  <!-- SETTINGS MODAL (Native <dialog>) -->
+  <dialog id="settings-dialog" closedby="any" aria-labelledby="settings-title">
+    <div class="dialog-header">
+      <h2 id="settings-title">AI Assistant Settings</h2>
+      <button type="button" command="close" commandfor="settings-dialog" class="btn-ghost" aria-label="Close settings">&times;</button>
+    </div>
+    <form id="settings-form" class="stack">
+      <div class="field">
+        <label for="settings-mode">Handling Mode</label>
+        <select id="settings-mode">
+          <option value="draft">Draft &amp; Notify Owner (Require approval before sending)</option>
+          <option value="auto">Auto-Reply &amp; Notify Owner (Send immediately)</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="settings-tone">Reply Tone</label>
+        <input id="settings-tone" type="text" placeholder="professional and helpful" />
+      </div>
+
+      <div class="field">
+        <label for="settings-gemini">Gemini API Key <span class="optional">(Leave unchanged or enter new key)</span></label>
+        <input id="settings-gemini" type="password" placeholder="AIza..." />
+      </div>
+
+      <label class="checkbox-row">
+        <input id="settings-notify-email" type="checkbox" />
+        <span>Send email notification to owner when AI replies</span>
+      </label>
+
+      <label class="checkbox-row">
+        <input id="settings-auto-monitor" type="checkbox" />
+        <span>Auto-Monitor inbox in the background for new unread emails</span>
+      </label>
+
+      <div class="field">
+        <label for="settings-interval">Background Check Interval</label>
+        <select id="settings-interval">
+          <option value="30">Every 30 seconds</option>
+          <option value="60">Every 60 seconds</option>
+          <option value="120">Every 2 minutes</option>
+          <option value="300">Every 5 minutes</option>
+        </select>
+      </div>
+
+      <div class="dialog-actions">
+        <button type="button" command="close" commandfor="settings-dialog" class="btn-ghost">Cancel</button>
+        <button type="submit" class="btn-primary">Save Settings</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
