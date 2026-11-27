@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MailMind AI — Personal Gmail Assistant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
@@ -19,8 +21,14 @@
       </div>
 
       <p class="auth-intro">
-        Attach your Gmail account to let the AI agent read incoming emails, understand each sender's request, draft or send replies, and notify you of every action.
+        Attach your Gmail account and go about your day — MailMind AI reads incoming emails, understands each sender's request, prepares or sends replies, and notifies you.
       </p>
+
+      <div class="steps-strip" aria-label="How it works">
+        <div class="step"><span class="step-num">1</span>Connect Gmail</div>
+        <div class="step"><span class="step-num">2</span>AI Reads &amp; Drafts</div>
+        <div class="step"><span class="step-num">3</span>You Get Notified</div>
+      </div>
 
       <form id="connect-form" class="stack">
         <div class="field">
@@ -29,10 +37,10 @@
         </div>
 
         <div class="field">
-          <label for="password-input">Gmail App Password</label>
-          <input id="password-input" type="password" name="password" placeholder="16-character App Password" autocomplete="current-password" required />
+          <label for="password-input">Gmail App Password <span class="optional">(16-character code)</span></label>
+          <input id="password-input" type="password" name="password" placeholder="xxxx xxxx xxxx xxxx" autocomplete="current-password" required />
           <small class="hint">
-            Uses encrypted IMAP &amp; SMTP directly with Google. Credentials stay in your active session only.
+            Encrypted IMAP &amp; SMTP directly with Google. Credentials stay in your active session only.
           </small>
         </div>
 
@@ -68,11 +76,11 @@
         <div id="auth-error" class="alert-error" hidden></div>
 
         <div class="auth-actions">
-          <button type="submit" id="connect-btn" class="btn-primary">
+          <button type="submit" id="connect-btn" class="btn-primary full-width">
             Authenticate &amp; Attach Gmail
           </button>
-          <button type="button" id="demo-btn" class="btn-secondary">
-            Try Interactive Demo
+          <button type="button" id="demo-btn" class="btn-demo full-width">
+            Try Interactive Demo (No Login Needed)
           </button>
         </div>
       </form>
@@ -99,13 +107,13 @@
         <span id="monitor-badge" class="pill pill-low"></span>
       </div>
       <div class="topbar-right">
-        <button type="button" id="refresh-btn" class="btn-ghost" title="Refresh Inbox">
+        <button type="button" id="refresh-btn" class="btn-secondary" title="Refresh Inbox">
           Refresh Inbox
         </button>
-        <button type="button" id="notif-toggle-btn" class="btn-ghost">
+        <button type="button" id="notif-toggle-btn" class="btn-secondary">
           Notifications <span id="notif-badge" class="badge" hidden>0</span>
         </button>
-        <button type="button" command="show-modal" commandfor="settings-dialog" id="open-settings-btn" class="btn-ghost">
+        <button type="button" command="show-modal" commandfor="settings-dialog" id="open-settings-btn" class="btn-secondary">
           Settings
         </button>
         <button type="button" id="disconnect-btn" class="btn-ghost danger">
@@ -117,29 +125,35 @@
     <div class="workspace">
       <!-- SIDEBAR -->
       <aside class="sidebar">
+        <span class="sidebar-section-label">AI Quick Action</span>
         <button type="button" id="scan-all-btn" class="btn-primary full-width">
           Run AI Assistant on Unread
         </button>
 
+        <span class="sidebar-section-label">Mailbox Views</span>
         <nav class="nav-list" aria-label="Mailbox views">
           <button type="button" class="nav-item active" data-filter="all">
-            <span>All Inbox</span>
+            <span class="nav-item-left">All Inbox</span>
             <span id="count-all" class="nav-count">0</span>
           </button>
           <button type="button" class="nav-item" data-filter="unread">
-            <span>Unread</span>
+            <span class="nav-item-left">Unread</span>
             <span id="count-unread" class="nav-count">0</span>
           </button>
           <button type="button" class="nav-item" data-filter="triaged">
-            <span>AI Drafted</span>
+            <span class="nav-item-left">AI Drafted</span>
             <span id="count-triaged" class="nav-count">0</span>
           </button>
           <button type="button" class="nav-item" data-filter="replied">
-            <span>AI Replied</span>
+            <span class="nav-item-left">AI Replied</span>
             <span id="count-replied" class="nav-count">0</span>
           </button>
+        </nav>
+
+        <span class="sidebar-section-label">Owner Activity</span>
+        <nav class="nav-list" aria-label="Owner activity">
           <button type="button" class="nav-item" data-filter="notifications">
-            <span>Owner Notifications</span>
+            <span class="nav-item-left">Owner Notifications</span>
             <span id="count-notifs" class="nav-count">0</span>
           </button>
         </nav>
@@ -163,10 +177,22 @@
         <div id="email-detail-pane" class="email-detail-pane">
           <div id="empty-detail" class="empty-state">
             <div class="empty-icon" aria-hidden="true">&#9993;</div>
-            <h3>Select an email to inspect</h3>
-            <p class="muted">
-              Choose a message from the left, or click <strong>Run AI Assistant on Unread</strong> to automatically read, understand requests, draft/send replies, and notify you.
-            </p>
+            <h3>Your AI email assistant is ready</h3>
+            <p class="muted">Follow these 3 simple steps to manage your inbox:</p>
+            <div class="steps-guide">
+              <div class="guide-step">
+                <span class="guide-step-num">1</span>
+                <span>Click <strong>Run AI Assistant on Unread</strong> in the sidebar to read and understand all unread messages at once.</span>
+              </div>
+              <div class="guide-step">
+                <span class="guide-step-num">2</span>
+                <span>Select any email on the left to inspect the sender's request summary and the AI-drafted reply.</span>
+              </div>
+              <div class="guide-step">
+                <span class="guide-step-num">3</span>
+                <span>Edit if needed and click <strong>Send Reply &amp; Notify Owner</strong> — or enable Auto-Reply in <strong>Settings</strong>.</span>
+              </div>
+            </div>
           </div>
 
           <article id="detail-content" class="detail-content" hidden>
@@ -216,7 +242,7 @@
                   <button type="submit" id="send-reply-btn" class="btn-primary">
                     Send Reply &amp; Notify Owner
                   </button>
-                  <button type="button" id="regenerate-btn" class="btn-ghost">
+                  <button type="button" id="regenerate-btn" class="btn-secondary">
                     Regenerate Draft
                   </button>
                 </div>
@@ -228,7 +254,7 @@
 
       <!-- OWNER NOTIFICATIONS VIEW -->
       <section id="notifications-workspace" class="notifications-workspace" hidden>
-        <div class="pane-header">
+        <div class="pane-header" style="border-radius:14px;">
           <div>
             <h2>Owner Notification Center</h2>
             <p class="muted">Live log of emails read, sender requests understood, and replies sent on your behalf.</p>
